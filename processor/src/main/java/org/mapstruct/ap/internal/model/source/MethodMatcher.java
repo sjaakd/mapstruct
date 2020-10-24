@@ -5,10 +5,14 @@
  */
 package org.mapstruct.ap.internal.model.source;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.ArrayType;
@@ -19,6 +23,8 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.SimpleTypeVisitor6;
+import javax.lang.model.util.Types;
+
 import org.mapstruct.ap.internal.util.TypeUtils;
 
 import org.mapstruct.ap.internal.model.common.Parameter;
@@ -72,6 +78,11 @@ public class MethodMatcher {
      */
     boolean matches(List<Type> sourceTypes, Type resultType) {
 
+        GenericAnalyser analyser = new GenericAnalyser( typeFactory, typeUtils, candidateMethod, sourceTypes, resultType );
+        if ( analyser.lineUp() == false ) {
+            return false;
+        }
+
         // check & collect generic types.
         Map<TypeVariable, TypeMirror> genericTypesMap = new HashMap<>();
 
@@ -116,6 +127,124 @@ public class MethodMatcher {
             }
         }
         return true;
+    }
+
+    private static class GenericAnalyser {
+
+        private TypeFactory typeFactory;
+        private TypeUtils typeUtils;
+        private Method candidateMethod;
+        private List<Type> sourceTypes;
+        private Type targetType;
+
+        public GenericAnalyser(TypeFactory typeFactory, TypeUtils typeUtils, Method candidateMethod,
+                               List<Type> sourceTypes, Type targetType) {
+            this.typeFactory = typeFactory;
+            this.typeUtils = typeUtils;
+            this.candidateMethod = candidateMethod;
+            this.sourceTypes = sourceTypes;
+            this.targetType = targetType;
+        }
+
+        Type candidateReturnType = null;
+        List<Type> candidateSourceParameterTypes;
+
+        private boolean lineUp() {
+
+            System.out.println( "lineing up: " + candidateMethod );
+            System.out.println( " with: " + sourceTypes + ", and: " + targetType );
+
+            if ( candidateMethod.getParameters().size() != sourceTypes.size() ) {
+                return false;
+            }
+
+            // TODO move to method
+            List<Type> genericTypeParams = candidateMethod.getExecutable().getTypeParameters().stream()
+                .map( Element::asType )
+                .map( typeFactory::getType )
+                .collect( Collectors.toList() );
+
+            candidateSourceParameterTypes = new ArrayList<>( candidateMethod.getParameters().size() );
+            if ( !genericTypeParams.isEmpty() ) {
+                for ( Type genericTypeParam : genericTypeParams ) {
+                    Type genericParamCandidate = null;
+                    for ( int i = 0; i< candidateMethod.getParameters().size(); i++ ) {
+                        Type sourceType = sourceTypes.get( i );
+                        Type candidateParamType = candidateMethod.getParameters().get( i ).getType();
+                        if ( sourceType != null ) {
+                            Type genericParam = genericTypeParam.resolveTypeVarToType( sourceType, candidateParamType
+                            );
+                            if ( genericParam == null ) {
+                                // the source parameter is not generic parameterized with the genericTypeParam,
+                                // add orignal sourceType to the candidateSourceParameterTypes
+                                candidateSourceParameterTypes.add( candidateParamType );
+                            }
+                            else if ( genericParamCandidate == null ) {
+                                // a generic parameter is present in the candidate source parameter. Store this
+                                // parameter to compare with subsequent occurrences (check if it lines up)
+                                // Use the concrete source parameter type instead of the generic parameter to do
+                                // further analysis
+                                genericParamCandidate = genericParam;
+                                candidateSourceParameterTypes.add( candidateParamType );
+                            }
+                            else if ( !areEquivalent( genericParamCandidate, genericParam ) ) {
+                                // Stop. The earlier derived generic parameter (in an earlier source type) is
+                                // not of the same type as found here, in this source type. Hence the parameter does
+                                // not line up with candidate method signature
+                                return false;
+                            }
+                            else {
+                                // a generic parameter is present in the candidate source parameter. Store this
+                                // parameter to compare with subsequent occurrences (check if it lines up)
+                                candidateSourceParameterTypes.add( candidateParamType );
+                            }
+                        }
+                        else {
+                            return false;
+                        }
+                    }
+                    Type returnType = candidateMethod.getReturnType();
+                    if ( returnType != null ) {
+                        // should also comply to contract
+                        Type genericParam = genericTypeParam.resolveTypeVarToType( targetType, returnType );
+                        if ( genericParam == null ) {
+                            // the source parameter is not generic parameterized with the genericTypeParam,
+                            // add orignal sourceType to the candidateSourceParameterTypes
+                            this.candidateReturnType = returnType;
+                        }
+                        else if ( !areEquivalent( genericParamCandidate, genericParam) ) {
+                            // earlier derived generic parameter (in the source types) is not of the same type
+                            // as found here in the return type.
+                            return false;
+                        }
+                        else {
+                            // a generic parameter is present in the candidate source parameter. Store the targetType
+                            // as candidateReturnType
+                            this.candidateReturnType = targetType;
+                        }
+
+                    }
+                }
+            }
+            else {
+                this.candidateSourceParameterTypes = candidateMethod.getSourceParameters().stream()
+                    .map( Parameter::getType )
+                    .collect( Collectors.toList());
+                this.candidateReturnType = candidateMethod.getReturnType();
+            }
+            return true;
+        }
+
+        boolean areEquivalent( Type a, Type b ) {
+            if ( a == null || b == null ) {
+                return false;
+            }
+            TypeMirror aMirror = a.getTypeMirror();
+            TypeMirror bMirror = b.getTypeMirror();
+            TypeMirror aBoxed = a.isPrimitive() ? typeUtils.boxedClass( (PrimitiveType) aMirror ).asType() : aMirror;
+            TypeMirror bBoxed = b.isPrimitive() ? typeUtils.boxedClass( (PrimitiveType) bMirror ).asType() : bMirror;
+            return typeUtils.isSameType( aBoxed, bBoxed );
+        }
     }
 
     private boolean matchSourceType(Type sourceType,

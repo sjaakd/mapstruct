@@ -1086,6 +1086,19 @@ public class Type extends ModelElement implements Comparable<Type> {
     }
 
     /**
+     * Returns the direct supertypes of a type.  The interface types, if any,
+     * will appear last in the list.
+     *
+     * @return the direct supertypes, or an empty list if none
+     */
+    public List<Type> getDirectSuperTypes() {
+        return typeUtils.directSupertypes( typeMirror )
+            .stream()
+            .map( typeFactory::getType )
+            .collect( Collectors.toList() );
+    }
+
+    /**
      * Searches for the given superclass and collects all type arguments for the given class
      *
      * @param superclass the superclass or interface the generic type arguments are searched for
@@ -1124,15 +1137,27 @@ public class Type extends ModelElement implements Comparable<Type> {
      * Steps through the declaredType in order to find a match for this typevar Type. It allignes with
      * the provided parameterized type where this typeVar type is used.
      *
-     * @param declaredType the type
-     * @param parameterizedType the parameterized type
+     * For example:
+     * this: T
+     * declaredType: JAXBElement<String>
+     * parameterizedType: JAXBElement<T>
+     * result: String
+     *
+     *
+     * @param declared the type
+     * @param parameterized the parameterized type
      *
      * @return the matching declared type.
      */
-    public Type resolveTypeVarToType(Type declaredType, Type parameterizedType) {
+    public Type resolveTypeVarToType(Type declared, Type parameterized) {
         if ( isTypeVar() ) {
             TypeVarMatcher typeVarMatcher = new TypeVarMatcher( typeUtils, this );
-            return typeVarMatcher.visit( parameterizedType.getTypeMirror(), declaredType );
+            Type result = typeVarMatcher.visit( parameterized.getTypeMirror(), declared );
+            System.out.println( "Sjaak: " + this +
+                ", declaredType: " + declared +
+                ", parameterizedType " + parameterized +
+                ", result: " + result );
+            return result;
         }
         return this;
     }
@@ -1142,32 +1167,89 @@ public class Type extends ModelElement implements Comparable<Type> {
         private TypeVariable typeVarToMatch;
         private TypeUtils types;
 
-        TypeVarMatcher(TypeUtils types, Type typeVarToMatch ) {
+        TypeVarMatcher(TypeUtils types, Type typeVarToMatch) {
             super( null );
             this.typeVarToMatch = (TypeVariable) typeVarToMatch.getTypeMirror();
             this.types = types;
         }
 
         @Override
-        public Type visitTypeVariable(TypeVariable t, Type parameterized) {
-            if ( types.isSameType( t, typeVarToMatch ) ) {
-                return parameterized;
+        public Type visitTypeVariable(TypeVariable parameterized, Type declared) {
+            if ( types.isSameType( parameterized, typeVarToMatch ) ) {
+                return declared;
             }
-            return super.visitTypeVariable( t, parameterized );
+            // default
+            return super.visitTypeVariable( parameterized, declared );
         }
 
+        /**
+         * We are just looking for T and if it lines up with the provided parameter, so covering scenarios
+         * as ? extends SomeType. We are not trying to determine whether its assignable
+          */
         @Override
-        public Type visitDeclared(DeclaredType t, Type parameterized) {
-            if ( types.isAssignable( types.erasure( t ), types.erasure( parameterized.getTypeMirror() ) ) ) {
-                // if same type, we can cast en assume number of type args are also the same
-                for ( int i = 0; i < t.getTypeArguments().size(); i++ ) {
-                    Type result = visit( t.getTypeArguments().get( i ), parameterized.getTypeParameters().get( i ) );
-                    if ( result != null ) {
-                        return result;
+        public Type visitWildcard(WildcardType t, Type declared) {
+            Type result = t.getExtendsBound() != null ? visit( t.getExtendsBound(), declared ) : super.DEFAULT_VALUE;
+            if ( result != super.DEFAULT_VALUE ) {
+                return result;
+            }
+            return t.getSuperBound() != null ? visit( t.getSuperBound(), declared ) : super.DEFAULT_VALUE;
+        }
+
+
+        @Override
+        public Type visitDeclared(DeclaredType parameterized, Type declared) {
+
+            List<Type> results = new ArrayList<>(  );
+            if ( parameterized.getTypeArguments().isEmpty() ) {
+                return super.DEFAULT_VALUE;
+            }
+            else if ( types.isSameType( types.erasure( parameterized ), types.erasure( declared.getTypeMirror() ) ) ) {
+                // only possible to compare parameters when the types are exactly the same
+                for ( int i = 0; i < parameterized.getTypeArguments().size(); i++ ) {
+                    TypeMirror parameterizedTypeArg = parameterized.getTypeArguments().get( i );
+                    Type declaredTypeArg = declared.getTypeParameters().get( i );
+                    Type result = visit( parameterizedTypeArg, declaredTypeArg );
+                    if ( result != super.DEFAULT_VALUE ) {
+                        results.add( result );
                     }
                 }
             }
-            return super.visitDeclared( t, parameterized );
+            else {
+                // Also check whether the implemented interfaces are parameterized
+                for ( Type declaredSuperType : declared.getDirectSuperTypes() ) {
+                    if ( Object.class.getName().equals( declaredSuperType.getFullyQualifiedName() ) ) {
+                        continue;
+                    }
+                    Type result = visitDeclared( parameterized, declaredSuperType );
+                    if ( result != super.DEFAULT_VALUE  ) {
+                        results.add( result );
+                    }
+                }
+
+                for ( TypeMirror parameterizedSuper : types.directSupertypes( parameterized ) ) {
+                    if ( isJavaLangObject( parameterizedSuper ) ) {
+                        continue;
+                    }
+                    Type result = visitDeclared( (DeclaredType) parameterizedSuper, declared );
+                    if ( result != super.DEFAULT_VALUE  ) {
+                        results.add( result );
+                    }
+                }
+            }
+            if ( results.isEmpty() ) {
+               return super.DEFAULT_VALUE;
+            }
+            else {
+                return results.stream().allMatch(results.get(0)::equals) ? results.get( 0 ) : super.DEFAULT_VALUE;
+            }
+        }
+
+        private boolean isJavaLangObject(TypeMirror type) {
+            if ( type instanceof DeclaredType ) {
+                return ( (TypeElement) ( (DeclaredType) type ).asElement() ).getQualifiedName()
+                    .contentEquals( Object.class.getName() );
+            }
+            return false;
         }
     }
 
