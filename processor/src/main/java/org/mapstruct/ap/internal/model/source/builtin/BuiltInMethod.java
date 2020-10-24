@@ -151,6 +151,11 @@ public abstract class BuiltInMethod implements Method {
         return null;
     }
 
+    @Override
+    public List<Type> getTypeParameters() {
+        return Collections.emptyList();
+    }
+
     /**
      * hashCode based on class
      *

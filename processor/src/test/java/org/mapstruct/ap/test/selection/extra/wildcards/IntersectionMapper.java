@@ -1,22 +1,24 @@
 package org.mapstruct.ap.test.selection.extra.wildcards;
 
+import java.io.Serializable;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
-public interface WildCardExtendsMapper {
+public interface IntersectionMapper {
 
-    WildCardExtendsMapper INSTANCE = Mappers.getMapper( WildCardExtendsMapper.class );
+    IntersectionMapper INSTANCE = Mappers.getMapper( IntersectionMapper.class );
 
     Target map( Source source);
 
-    default <T extends TypeB> T unwrap(Wrapper<? extends T> t) {
+    default <T extends TypeB & Serializable> T unwrap(Wrapper<? extends T> t) {
         return t.getWrapped();
     }
 
     class Source {
 
-        private Wrapper<TypeC> prop;
+        private final Wrapper<TypeC> prop;
 
         public Source(Wrapper<TypeC> prop) {
             this.prop = prop;
@@ -26,14 +28,11 @@ public interface WildCardExtendsMapper {
             return prop;
         }
 
-        public void setProp( Wrapper<TypeC> prop) {
-            this.prop = prop;
-        }
     }
 
     class Wrapper<T> {
 
-        private T wrapped;
+        private final T wrapped;
 
         public Wrapper(T wrapped) {
             this.wrapped = wrapped;
@@ -58,7 +57,10 @@ public interface WildCardExtendsMapper {
         }
     }
 
-    class TypeC extends TypeB {
+    /**
+     * TypeC must intersect both TypeB & Serializable
+     */
+    class TypeC extends TypeB implements Serializable {
     }
 
     class TypeB extends TypeA {

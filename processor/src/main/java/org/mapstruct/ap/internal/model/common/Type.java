@@ -21,6 +21,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.PrimitiveType;
 import javax.lang.model.type.TypeKind;
@@ -486,6 +487,10 @@ public class Type extends ModelElement implements Comparable<Type> {
         TypeMirror typeMirrorToMatch = isWildCardExtendsBound() ? getTypeBound().typeMirror : typeMirror;
 
         return typeUtils.isAssignable( typeMirrorToMatch, other.typeMirror );
+    }
+
+    public boolean isAssignableTo2(Type other) {
+        return typeUtils.isAssignable( typeMirror, other.typeMirror );
     }
 
     /**
@@ -1134,7 +1139,7 @@ public class Type extends ModelElement implements Comparable<Type> {
     }
 
     /**
-     * Steps through the declaredType in order to find a match for this typevar Type. It allignes with
+     * Steps through the declaredType in order to find a match for this typeVar Type. It aligns with
      * the provided parameterized type where this typeVar type is used.
      *
      * For example:
@@ -1144,57 +1149,89 @@ public class Type extends ModelElement implements Comparable<Type> {
      * result: String
      *
      *
+     * this: ? extends T
+     * declaredType: Callable<? extends T>
+     * parameterizedType: Callable<BigDecimal>
+     * return: BigDecimal
+     *
      * @param declared the type
      * @param parameterized the parameterized type
      *
      * @return the matching declared type.
      */
     public Type resolveTypeVarToType(Type declared, Type parameterized) {
-        if ( isTypeVar() ) {
-            TypeVarMatcher typeVarMatcher = new TypeVarMatcher( typeUtils, this );
-            Type result = typeVarMatcher.visit( parameterized.getTypeMirror(), declared );
-            System.out.println( "Sjaak: " + this +
-                ", declaredType: " + declared +
-                ", parameterizedType " + parameterized +
-                ", result: " + result );
-            return result;
+        if ( isTypeVarOrBoundByTypeVar() ) {
+            TypeVarMatcher typeVarMatcher = new TypeVarMatcher( typeFactory, typeUtils, this );
+            return typeVarMatcher.visit( parameterized.getTypeMirror(), declared );
         }
         return this;
     }
 
+    public boolean isTypeVarOrBoundByTypeVar() {
+        return isTypeVar()
+            || ( ( isWildCardExtendsBound() || isWildCardSuperBound() ) && getTypeBound().isTypeVar()
+            || ( isArrayType() && getComponentType().isTypeVar() ) );
+    }
+
     private static class TypeVarMatcher extends SimpleTypeVisitor8<Type, Type> {
 
-        private TypeVariable typeVarToMatch;
-        private TypeUtils types;
+        private final TypeFactory typeFactory;
+        private final Type typeToMatch;
+        private final TypeUtils types;
 
-        TypeVarMatcher(TypeUtils types, Type typeVarToMatch) {
+        /**
+         * @param typeFactory factory
+         * @param types type utils
+         * @param typeToMatch the typeVar or wildcard with typeVar bound
+         */
+        TypeVarMatcher(TypeFactory typeFactory, TypeUtils types, Type typeToMatch) {
             super( null );
-            this.typeVarToMatch = (TypeVariable) typeVarToMatch.getTypeMirror();
+            this.typeFactory = typeFactory;
+            this.typeToMatch = typeToMatch;
             this.types = types;
         }
 
         @Override
         public Type visitTypeVariable(TypeVariable parameterized, Type declared) {
-            if ( types.isSameType( parameterized, typeVarToMatch ) ) {
+            if ( typeToMatch.isTypeVar() && types.isSameType( parameterized, typeToMatch.getTypeMirror() ) ) {
                 return declared;
             }
-            // default
-            return super.visitTypeVariable( parameterized, declared );
+            return super.DEFAULT_VALUE;
         }
 
         /**
-         * We are just looking for T and if it lines up with the provided parameter, so covering scenarios
-         * as ? extends SomeType. We are not trying to determine whether its assignable
+         * If ? extends SomeTime equals the boundary set in typeVarToMatch (NOTE: you can't compare the wildcard itself)
+         * then return a result;
           */
         @Override
-        public Type visitWildcard(WildcardType t, Type declared) {
-            Type result = t.getExtendsBound() != null ? visit( t.getExtendsBound(), declared ) : super.DEFAULT_VALUE;
-            if ( result != super.DEFAULT_VALUE ) {
-                return result;
+        public Type visitWildcard(WildcardType parameterized, Type declared) {
+            if ( typeToMatch.isWildCardExtendsBound() && parameterized.getExtendsBound() != null
+                && types.isSameType( typeToMatch.getTypeBound().getTypeMirror(), parameterized.getExtendsBound() ) ) {
+                return declared;
             }
-            return t.getSuperBound() != null ? visit( t.getSuperBound(), declared ) : super.DEFAULT_VALUE;
+            else if ( typeToMatch.isWildCardSuperBound() && parameterized.getSuperBound() != null
+                && types.isSameType( typeToMatch.getTypeBound().getTypeMirror(), parameterized.getSuperBound() ) ) {
+                return declared;
+            }
+            if ( parameterized.getExtendsBound() != null ) {
+                visit( parameterized.getExtendsBound(), declared );
+            }
+            else if (parameterized.getSuperBound() != null ){
+                visit( parameterized.getSuperBound(), declared );
+            }
+            return super.DEFAULT_VALUE;
         }
 
+        @Override
+        public Type visitArray(ArrayType parameterized, Type declared) {
+            if ( types.isSameType( parameterized.getComponentType(), typeToMatch.getTypeMirror() ) ) {
+                return declared;
+            }
+            if ( declared.isArrayType() ) {
+                visit( parameterized.getComponentType(), declared.getComponentType() );
+            }
+            return super.DEFAULT_VALUE;
+        }
 
         @Override
         public Type visitDeclared(DeclaredType parameterized, Type declared) {

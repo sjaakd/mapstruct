@@ -53,7 +53,4 @@ public class GenericTypeMapper {
         return (String) t.getWrapped();
     }
 
-    public <T extends TypeB & Serializable> T getWildCardExtendsMBType(WildCardExtendsMBWrapper<? extends T> t) {
-        return t.getWrapped();
-    }
 }

@@ -39,7 +39,6 @@ public class ConversionTest {
 
         // setup used types
         TypeB typeB = new TypeB();
-        TypeC typeC = new TypeC();
 
         // setup source
         Source source = new Source();
@@ -51,10 +50,7 @@ public class ConversionTest {
         source.setFooNested( new Wrapper<>( new Wrapper<>( new BigDecimal( 5 ) ) ) );
         source.setFooUpperBoundCorrect( new UpperBoundWrapper<>( typeB ) );
         source.setFooWildCardExtendsString( new WildCardExtendsWrapper<>( "test3" ) );
-        source.setFooWildCardExtendsTypeCCorrect( new WildCardExtendsWrapper<>( typeC ) );
-        source.setFooWildCardExtendsTypeBCorrect( new WildCardExtendsWrapper<>( typeB ) );
         source.setFooWildCardSuperString( new WildCardSuperWrapper<>( "test4" ) );
-        source.setFooWildCardExtendsMBTypeCCorrect( new WildCardExtendsMBWrapper<>( typeC ) );
         source.setFooWildCardSuperTypeBCorrect( new WildCardSuperWrapper<>( typeB ) );
 
         // define wrapper
@@ -71,12 +67,8 @@ public class ConversionTest {
         assertThat( target.getFooNested() ).isEqualTo( new BigDecimal( 5 ) );
         assertThat( target.getFooUpperBoundCorrect() ).isEqualTo( typeB );
         assertThat( target.getFooWildCardExtendsString() ).isEqualTo( "test3" );
-        assertThat( target.getFooWildCardExtendsTypeCCorrect() ).isEqualTo( typeC );
-        assertThat( target.getFooWildCardExtendsTypeBCorrect() ).isEqualTo( typeB );
         assertThat( target.getFooWildCardSuperString() ).isEqualTo( "test4" );
-        assertThat( target.getFooWildCardExtendsMBTypeCCorrect() ).isEqualTo( typeC );
         assertThat( target.getFooWildCardSuperTypeBCorrect() ).isEqualTo( typeB );
-
     }
 
     @Test

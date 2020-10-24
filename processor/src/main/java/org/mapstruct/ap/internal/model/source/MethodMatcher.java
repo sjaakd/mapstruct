@@ -9,10 +9,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.ArrayType;
@@ -23,7 +22,6 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.WildcardType;
 import javax.lang.model.util.SimpleTypeVisitor6;
-import javax.lang.model.util.Types;
 
 import org.mapstruct.ap.internal.util.TypeUtils;
 
@@ -72,60 +70,66 @@ public class MethodMatcher {
      * Whether the given source and target types are matched by this matcher's candidate method.
      *
      * @param sourceTypes the source types
-     * @param resultType the target type
+     * @param targetType the target type
      * @return {@code true} when both, source type and target types match the signature of this matcher's method;
      *         {@code false} otherwise.
      */
-    boolean matches(List<Type> sourceTypes, Type resultType) {
+    boolean matches(List<Type> sourceTypes, Type targetType) {
 
-        GenericAnalyser analyser = new GenericAnalyser( typeFactory, typeUtils, candidateMethod, sourceTypes, resultType );
+        GenericAnalyser analyser = new GenericAnalyser( typeFactory, typeUtils, candidateMethod, sourceTypes, targetType );
         if ( analyser.lineUp() == false ) {
             return false;
         }
 
-        // check & collect generic types.
-        Map<TypeVariable, TypeMirror> genericTypesMap = new HashMap<>();
-
-        if ( candidateMethod.getParameters().size() == sourceTypes.size() ) {
-            int i = 0;
-            for ( Parameter candidateParam : candidateMethod.getParameters() ) {
-                Type sourceType = sourceTypes.get( i++ );
-                if ( sourceType == null
-                    || !matchSourceType( sourceType, candidateParam.getType(), genericTypesMap ) ) {
-                    return false;
-                }
+        for ( int i = 0; i < sourceTypes.size(); i++ ) {
+            Type candidateSourceParType = analyser.candidateParTypes.get( i );
+            if ( !sourceTypes.get( i ).isAssignableTo( candidateSourceParType ) ) {
+                return false;
             }
-        }
-        else {
-            return false;
         }
 
         // check if the method matches the proper result type to construct
-        Parameter targetTypeParameter = candidateMethod.getTargetTypeParameter();
-        if ( targetTypeParameter != null ) {
-            Type returnClassType = typeFactory.classTypeOf( resultType );
-            if ( !matchSourceType( returnClassType, targetTypeParameter.getType(), genericTypesMap ) ) {
+//        Parameter targetTypeParameter = candidateMethod.getTargetTypeParameter();
+//        if ( targetTypeParameter != null ) {
+//            Type returnClassType = typeFactory.classTypeOf( resultType );
+//            if ( !matchSourceType( returnClassType, targetTypeParameter.getType(), genericTypesMap ) ) {
+//                return false;
+//            }
+//        }
+        if ( analyser.positionMappingTargetType != null ) {
+            Type mappingTargetType = analyser.candidateParTypes.get( analyser.positionMappingTargetType );
+            Type returnClassType = typeFactory.classTypeOf( targetType );
+            if ( !returnClassType.isAssignableTo( mappingTargetType ) ) {
                 return false;
             }
         }
+
+        if ( !analyser.candidateReturnType.isVoid() ) {
+            if ( !analyser.candidateReturnType.isAssignableTo( targetType ) ) {
+                return false;
+            }
+        }
+
+        // check if the method matches the proper result type to construct
+
 
         // check result type
-        if ( !matchResultType( resultType, genericTypesMap ) ) {
-            return false;
-        }
-
-        // check if all type parameters are indeed mapped
-        if ( candidateMethod.getExecutable().getTypeParameters().size() != genericTypesMap.size() ) {
-            return false;
-        }
-
-        // check if all entries are in the bounds
-        for ( Map.Entry<TypeVariable, TypeMirror> entry : genericTypesMap.entrySet() ) {
-            if ( !isWithinBounds( entry.getValue(), getTypeParamFromCandidate( entry.getKey() ) ) ) {
-                // checks if the found Type is in bounds of the TypeParameters bounds.
-                return false;
-            }
-        }
+//        if ( !matchResultType( targetType, genericTypesMap ) ) {
+//            return false;
+//        }
+//
+//        // check if all type parameters are indeed mapped
+//        if ( candidateMethod.getExecutable().getTypeParameters().size() != genericTypesMap.size() ) {
+//            return false;
+//        }
+//
+//        // check if all entries are in the bounds
+//        for ( Map.Entry<TypeVariable, TypeMirror> entry : genericTypesMap.entrySet() ) {
+//            if ( !isWithinBounds( entry.getValue(), getTypeParamFromCandidate( entry.getKey() ) ) ) {
+//                // checks if the found Type is in bounds of the TypeParameters bounds.
+//                return false;
+//            }
+//        }
         return true;
     }
 
@@ -147,92 +151,227 @@ public class MethodMatcher {
         }
 
         Type candidateReturnType = null;
-        List<Type> candidateSourceParameterTypes;
+        List<Type> candidateParTypes;
+        Integer positionMappingTargetType = null;
 
         private boolean lineUp() {
-
-            System.out.println( "lineing up: " + candidateMethod );
-            System.out.println( " with: " + sourceTypes + ", and: " + targetType );
 
             if ( candidateMethod.getParameters().size() != sourceTypes.size() ) {
                 return false;
             }
 
-            // TODO move to method
-            List<Type> genericTypeParams = candidateMethod.getExecutable().getTypeParameters().stream()
-                .map( Element::asType )
-                .map( typeFactory::getType )
-                .collect( Collectors.toList() );
+            List<Type> genMethodParTypes = candidateMethod.getTypeParameters();
+            int nrOfMethodPars = candidateMethod.getParameters().size();
 
-            candidateSourceParameterTypes = new ArrayList<>( candidateMethod.getParameters().size() );
-            if ( !genericTypeParams.isEmpty() ) {
-                for ( Type genericTypeParam : genericTypeParams ) {
-                    Type genericParamCandidate = null;
-                    for ( int i = 0; i< candidateMethod.getParameters().size(); i++ ) {
-                        Type sourceType = sourceTypes.get( i );
-                        Type candidateParamType = candidateMethod.getParameters().get( i ).getType();
-                        if ( sourceType != null ) {
-                            Type genericParam = genericTypeParam.resolveTypeVarToType( sourceType, candidateParamType
-                            );
-                            if ( genericParam == null ) {
-                                // the source parameter is not generic parameterized with the genericTypeParam,
-                                // add orignal sourceType to the candidateSourceParameterTypes
-                                candidateSourceParameterTypes.add( candidateParamType );
-                            }
-                            else if ( genericParamCandidate == null ) {
-                                // a generic parameter is present in the candidate source parameter. Store this
-                                // parameter to compare with subsequent occurrences (check if it lines up)
-                                // Use the concrete source parameter type instead of the generic parameter to do
-                                // further analysis
-                                genericParamCandidate = genericParam;
-                                candidateSourceParameterTypes.add( candidateParamType );
-                            }
-                            else if ( !areEquivalent( genericParamCandidate, genericParam ) ) {
-                                // Stop. The earlier derived generic parameter (in an earlier source type) is
-                                // not of the same type as found here, in this source type. Hence the parameter does
-                                // not line up with candidate method signature
+            if ( !genMethodParTypes.isEmpty() ) {
+
+                // find candidates for generic parameter
+
+                // Per method parameter (argument) the set of generic parameters or generic parameterized wildcards
+                // with their resolved type.
+                List<Map<Type, Type>> genParsForMethodPar = Stream.generate( () -> new HashMap<Type, Type>() )
+                    .limit( nrOfMethodPars )
+                    .collect( Collectors.toList() );
+
+                Type returnType = candidateMethod.getReturnType();
+
+                Map<Type, Type> genParsForReturnType = new HashMap<>();
+                for ( int i = 0; i < nrOfMethodPars; i++ ) {
+                    Type sourceType = sourceTypes.get( i );
+                    Parameter par = candidateMethod.getParameters().get( i );
+                    Type parType = par.getType();
+                    if ( par.isMappingTarget() ) {
+                        positionMappingTargetType = i;
+                    }
+
+                    Map<Type, Type> genParsForThisPar = genParsForMethodPar.get( i );
+                    if ( parType.isTypeVarOrBoundByTypeVar() ) {
+                        // parType is a generic type or bounded by a generic type
+                        genParsForThisPar.put( parType, sourceType );
+                    }
+                    // investigate the type parameters of parType
+                    for ( Type genParPar : parType.getTypeParameters() ) {
+                        Type candidateTypeForGenPar = genParPar.resolveTypeVarToType( sourceType, parType );
+                        if ( candidateTypeForGenPar != null ) {
+                            if ( conflictWithPrior( genParsForThisPar, genParPar, candidateTypeForGenPar ) ) {
+                                // fail fast when more candidates are found for the same type parameter
                                 return false;
                             }
-                            else {
-                                // a generic parameter is present in the candidate source parameter. Store this
-                                // parameter to compare with subsequent occurrences (check if it lines up)
-                                candidateSourceParameterTypes.add( candidateParamType );
-                            }
-                        }
-                        else {
-                            return false;
+                            genParsForThisPar.put( genParPar, candidateTypeForGenPar );
                         }
                     }
-                    Type returnType = candidateMethod.getReturnType();
-                    if ( returnType != null ) {
+                }
+                if ( !returnType.isVoid() ) {
+                    // parType could be a generic type as well
+                    if ( returnType.isTypeVarOrBoundByTypeVar() ) {
+                        genParsForReturnType.put( returnType, targetType );
+                    }
+                    for ( Type genParReturn : returnType.getTypeParameters() ) {
                         // should also comply to contract
-                        Type genericParam = genericTypeParam.resolveTypeVarToType( targetType, returnType );
-                        if ( genericParam == null ) {
-                            // the source parameter is not generic parameterized with the genericTypeParam,
-                            // add orignal sourceType to the candidateSourceParameterTypes
-                            this.candidateReturnType = returnType;
+                        Type candidateTypeForGenPar = genParReturn.resolveTypeVarToType( targetType, returnType );
+                        if ( candidateTypeForGenPar != null ) {
+                            if ( conflictWithPrior( genParsForReturnType, genParReturn, candidateTypeForGenPar ) ) {
+                                // fail fast when more candidates are found for the same type parameter
+                                return false;
+                            }
+                            genParsForReturnType.put( genParReturn, candidateTypeForGenPar );
                         }
-                        else if ( !areEquivalent( genericParamCandidate, genericParam) ) {
-                            // earlier derived generic parameter (in the source types) is not of the same type
-                            // as found here in the return type.
+                    }
+                }
+
+                // validate
+
+                // iterate over the method generic parameters.
+                for ( Type genMethodParType : genMethodParTypes ) {
+
+                    // Step 1: Check whether all parameters and return type resolved to the same type for the
+                    // generic method parameter type
+                    Type candidateTypeForGenPar = null;
+                    for (int i = 0; i< nrOfMethodPars; i++ ) {
+                        Map<Type, Type> genParsForThisPar = genParsForMethodPar.get( i );
+                        Type genParForThisPar = genParsForThisPar.get( genMethodParType );
+                        if ( genParForThisPar != null ) {
+                            if ( candidateTypeForGenPar == null ) {
+                                candidateTypeForGenPar = genParForThisPar;
+                            }
+                            else if ( !areEquivalent( genParForThisPar, candidateTypeForGenPar ) ) {
+                                // fail: the method parameters, parameter types resolved to a different type
+                                return false;
+                            }
+                        }
+                    }
+                    if ( !returnType.isVoid() ) {
+                        Type genParForReturn = genParsForReturnType.get( genMethodParType );
+                        if ( genParForReturn != null ) {
+                            if ( candidateTypeForGenPar == null ) {
+                                candidateTypeForGenPar = genParForReturn;
+                            }
+                            else if ( !areEquivalent( genParForReturn, candidateTypeForGenPar ) ) {
+                                // fail: the method parameters, parameter types resolved to a different type
+                                return false;
+                            }
+                        }
+                    }
+
+                    // Step 2: Check whether the found parameter (when found) complies to the type bounds.
+                    // NOTE: It can be that only references to parameterized wildcards bound are found. See step 3.
+                    if ( candidateTypeForGenPar != null &&
+                        !compliesToTypeBounds( genMethodParType, candidateTypeForGenPar )) {
+                        return false;
+                    }
+
+                    // Step 3. It can be that the parameter is only used as wildcard bound: ? extends T in the method
+                    // parameter definition, for instance. there's no reference to A directly in:
+                    // <A extends Number> List<Integer> getEqualInts(List<? extends A> x, @Context List<? extends A> y)
+                    for (int i = 0; i< nrOfMethodPars; i++ ) {
+                        Map<Type, Type> genParsForThisPar = genParsForMethodPar.get( i );
+                        Type boundary = candidateTypeForGenPar != null ? candidateTypeForGenPar : genMethodParType.getTypeBound();
+                        if ( !wildCardsCompliesToBounds( genParsForThisPar, boundary ) ) {
                             return false;
-                        }
-                        else {
-                            // a generic parameter is present in the candidate source parameter. Store the targetType
-                            // as candidateReturnType
-                            this.candidateReturnType = targetType;
                         }
 
                     }
+                    if ( !returnType.isVoid() ) {
+                        Type boundary = candidateTypeForGenPar != null ? candidateTypeForGenPar : genMethodParType.getTypeBound();
+                        if ( !wildCardsCompliesToBounds( genParsForReturnType, boundary ) ) {
+                            return false;
+                        }
+                    }
+                }
+
+                // resolve parameters & return type
+                this.candidateParTypes = new ArrayList<>();
+                for ( int i = 0; i < nrOfMethodPars; i++ ) {
+
+                    Type parType = candidateMethod.getParameters().get( i ).getType();
+                    Map<Type, Type> genParsForThisPar = genParsForMethodPar.get( i );
+                    if ( parType.isTypeVarOrBoundByTypeVar() ) {
+                        this.candidateParTypes.add( getTypeArg( genParsForThisPar, parType ) );
+                    }
+                    else {
+                        TypeMirror[] typeArgs = new TypeMirror[parType.getTypeParameters().size()];
+                        for ( int j = 0; j < parType.getTypeParameters().size(); j++ ) {
+                            Type candidate = getTypeArg(genParsForThisPar, parType.getTypeParameters().get( j ) );
+                            if ( candidate == null ) {
+                                // E.g. BigDecimalWrapper implements Wrapper<T> drops out here
+                                return false;
+                            }
+                            typeArgs[j] = candidate.getTypeMirror();
+                        }
+                        DeclaredType typeArg = typeUtils.getDeclaredType( parType.getTypeElement(), typeArgs );
+                        this.candidateParTypes.add( typeFactory.getType( typeArg ) );
+                    }
+                }
+                if ( !returnType.isVoid() ) {
+                    if ( returnType.isTypeVarOrBoundByTypeVar() ) {
+                        this.candidateReturnType = getTypeArg( genParsForReturnType, returnType );
+                    }
+                    else {
+                        TypeMirror[] typeArgs = new TypeMirror[returnType.getTypeParameters().size()];
+                        for ( int i = 0; i < returnType.getTypeParameters().size(); i++ ) {
+                            Type candidate = getTypeArg( genParsForReturnType, returnType.getTypeParameters().get( i ) );
+                            if ( candidate == null ) {
+                                // E.g. BigDecimalWrapper implements Wrapper<T> drops out here
+                                return false;
+                            }
+                            typeArgs[i] = candidate.getTypeMirror();
+                        }
+                        DeclaredType typeArg = typeUtils.getDeclaredType( returnType.getTypeElement(), typeArgs );
+                        this.candidateReturnType = typeFactory.getType( typeArg );
+                    }
+                }
+                else {
+                    this.candidateReturnType = returnType;
                 }
             }
             else {
-                this.candidateSourceParameterTypes = candidateMethod.getSourceParameters().stream()
+                this.candidateParTypes = candidateMethod.getParameters().stream()
                     .map( Parameter::getType )
-                    .collect( Collectors.toList());
+                    .collect( Collectors.toList() );
                 this.candidateReturnType = candidateMethod.getReturnType();
             }
             return true;
+        }
+
+        private Type getTypeArg(Map<Type, Type> candidates, Type genParPar) {
+            Type result = candidates.get( genParPar );
+            if ( result != null ) {
+                return result;
+            }
+            // result can be a parameterized wild card, ? extends T
+            for ( Map.Entry<Type, Type> entry : candidates.entrySet() ) {
+                if (genParPar.equals( entry.getKey().getTypeBound() ) ) {
+                    return entry.getValue();
+                }
+            }
+            return null;
+        }
+
+        boolean compliesToTypeBounds( Type genParOrWildCard, Type typeToComply ) {
+            if ( genParOrWildCard.isWildCardExtendsBound() ) {
+                return typeToComply.isAssignableTo2( genParOrWildCard.getTypeBound() );
+            }
+            if ( genParOrWildCard.isWildCardSuperBound() ) {
+                return genParOrWildCard.getTypeBound().isAssignableTo2( typeToComply );
+            }
+            // should not happen, the genParOrWildCard does not have any bounds.
+            return true;
+        }
+
+        boolean wildCardsCompliesToBounds(Map<Type, Type> candidates, Type genPar) {
+            for ( Map.Entry<Type, Type> entry : candidates.entrySet() ) {
+                if ( entry.getKey().isWildCardExtendsBound() ) {
+                    return entry.getValue().isAssignableTo2( genPar );
+                }
+                if ( entry.getKey().isWildCardSuperBound() ) {
+                    return genPar.isAssignableTo2( entry.getValue() );
+                }
+            }
+            return true;
+        }
+
+        boolean conflictWithPrior(Map<Type, Type> genParTypes, Type genType, Type candidate) {
+            return genParTypes.containsKey( genType ) && areEquivalent( genType, candidate );
         }
 
         boolean areEquivalent( Type a, Type b ) {
