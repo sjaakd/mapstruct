@@ -96,6 +96,8 @@ public class MethodMatcher {
 //                return false;
 //            }
 //        }
+
+        // TODO: is this really needed:
         if ( analyser.positionMappingTargetType != null ) {
             Type mappingTargetType = analyser.candidateParTypes.get( analyser.positionMappingTargetType );
             Type returnClassType = typeFactory.classTypeOf( targetType );
