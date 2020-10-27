@@ -471,15 +471,16 @@ public class Type extends ModelElement implements Comparable<Type> {
     }
 
     /**
-     * Whether this type is assignable to the given other type.
+     * Whether this type is assignable to the given other type, considering the "extends / upper bounds"
+     * as well.
      *
      * @param other The other type.
      *
      * @return {@code true} if and only if this type is assignable to the given other type.
      */
-    // TODO This doesn't yet take super wild card types into account;
-    // e.g. Number wouldn't be assignable to ? super Number atm. (is there any practical use case)
     public boolean isAssignableTo(Type other) {
+
+        // ? extends Integer, T extends Integer and ? super Integer all include Integer
         if ( equals( other ) ) {
             return true;
         }

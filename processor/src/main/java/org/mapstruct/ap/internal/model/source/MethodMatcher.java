@@ -350,23 +350,30 @@ public class MethodMatcher {
         }
 
         boolean compliesToTypeBounds( Type genParOrWildCard, Type typeToComply ) {
-            if ( genParOrWildCard.isWildCardExtendsBound() ) {
-                return typeToComply.isAssignableTo2( genParOrWildCard.getTypeBound() );
-            }
             if ( genParOrWildCard.isWildCardSuperBound() ) {
-                return genParOrWildCard.getTypeBound().isAssignableTo2( typeToComply );
+                return genParOrWildCard.getTypeBound().isAssignableTo( typeToComply );
             }
-            // should not happen, the genParOrWildCard does not have any bounds.
-            return true;
+            // to cope with the extends or upper bound
+            return typeToComply.isAssignableTo( genParOrWildCard.getTypeBound() );
         }
 
+        /**
+         * e.g. <T extends TypeBound> void map( List<? extends T> )
+         *
+         * Concerns cases like ? extends T and ? super T. They are the key in the map. We cannot derive
+         * T itself (sometimes), but we can check if the candidate complies to its defined bound.
+         *
+         * @param candidates Map.Entry(<? extends T>, String)
+         * @param genPar e.g. T extends TypeBound
+         * @return if String is assignable to TypeBound
+         */
         boolean wildCardsCompliesToBounds(Map<Type, Type> candidates, Type genPar) {
             for ( Map.Entry<Type, Type> entry : candidates.entrySet() ) {
                 if ( entry.getKey().isWildCardExtendsBound() ) {
-                    return entry.getValue().isAssignableTo2( genPar );
+                    return entry.getValue().isAssignableTo( genPar );
                 }
                 if ( entry.getKey().isWildCardSuperBound() ) {
-                    return genPar.isAssignableTo2( entry.getValue() );
+                    return genPar.isAssignableTo( entry.getValue() );
                 }
             }
             return true;

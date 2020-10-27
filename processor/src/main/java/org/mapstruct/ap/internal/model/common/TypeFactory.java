@@ -613,7 +613,9 @@ public class TypeFactory {
             if ( typeVariableType.getUpperBound() != null ) {
                 return typeVariableType.getUpperBound();
             }
-            // Lowerbounds intentionally left out: Type variables otherwise have a lower bound of NullType.
+            // Lowerbounds intentionally left out: <T super Integer> is not allowed,
+            // see:http://www.angelikalanger.com/GenericsFAQ/FAQSections/
+            // TypeParameters.html#What%20is%20a%20bounded%20type%20parameter?
         }
 
         return typeMirror;
