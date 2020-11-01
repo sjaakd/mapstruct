@@ -479,18 +479,10 @@ public class Type extends ModelElement implements Comparable<Type> {
      * @return {@code true} if and only if this type is assignable to the given other type.
      */
     public boolean isAssignableTo(Type other) {
-
-        // ? extends Integer, T extends Integer and ? super Integer all include Integer
-        if ( equals( other ) ) {
-            return true;
+        if ( TypeKind.WILDCARD == typeMirror.getKind() ) {
+            return typeUtils.contains( typeMirror, other.typeMirror );
         }
 
-        TypeMirror typeMirrorToMatch = isWildCardExtendsBound() ? getTypeBound().typeMirror : typeMirror;
-
-        return typeUtils.isAssignable( typeMirrorToMatch, other.typeMirror );
-    }
-
-    public boolean isAssignableTo2(Type other) {
         return typeUtils.isAssignable( typeMirror, other.typeMirror );
     }
 
