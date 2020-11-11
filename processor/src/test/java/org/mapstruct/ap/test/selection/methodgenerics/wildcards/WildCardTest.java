@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.mapstruct.ap.test.selection.extra.wildcards;
+package org.mapstruct.ap.test.selection.methodgenerics.wildcards;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,18 +22,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class WildCardTest {
 
     @Test
-    @WithClasses( ExtendsMapper.class )
+    @WithClasses( SourceWildCardExtendsMapper.class )
     public void testExtendsRelation() {
 
         // prepare source
-        ExtendsMapper.TypeB typeB = new ExtendsMapper.TypeB();
-        ExtendsMapper.Wrapper wrapperB = new ExtendsMapper.Wrapper( typeB );
-        ExtendsMapper.TypeC typeC = new ExtendsMapper.TypeC();
-        ExtendsMapper.Wrapper wrapperC = new ExtendsMapper.Wrapper( typeC );
-        ExtendsMapper.Source source = new ExtendsMapper.Source( wrapperB, wrapperC );
+        SourceWildCardExtendsMapper.TypeB typeB = new SourceWildCardExtendsMapper.TypeB();
+        SourceWildCardExtendsMapper.Wrapper wrapperB = new SourceWildCardExtendsMapper.Wrapper( typeB );
+        SourceWildCardExtendsMapper.TypeC typeC = new SourceWildCardExtendsMapper.TypeC();
+        SourceWildCardExtendsMapper.Wrapper wrapperC = new SourceWildCardExtendsMapper.Wrapper( typeC );
+        SourceWildCardExtendsMapper.Source source = new SourceWildCardExtendsMapper.Source( wrapperB, wrapperC );
 
         // action
-        ExtendsMapper.Target target = ExtendsMapper.INSTANCE.map( source );
+        SourceWildCardExtendsMapper.Target target = SourceWildCardExtendsMapper.INSTANCE.map( source );
 
         // verify target
         assertThat( target ).isNotNull();

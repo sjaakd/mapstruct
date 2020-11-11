@@ -67,7 +67,7 @@ public abstract class BuiltInMethod implements Method {
 
         Type sourceType = first( sourceTypes );
 
-        Type returnType = getReturnType().resolveTypeVarToType( sourceType, getParameter().getType() );
+        Type returnType = getReturnType().resolveParameterToType( sourceType, getParameter().getType() ).getMatch();
         if ( returnType == null ) {
             return false;
         }

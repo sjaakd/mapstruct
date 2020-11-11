@@ -3,7 +3,9 @@
  *
  * Licensed under the Apache License version 2.0, available at http://www.apache.org/licenses/LICENSE-2.0
  */
-package org.mapstruct.ap.test.selection.extra.onewrappedparam;
+package org.mapstruct.ap.test.selection.methodgenerics.targettype;
+
+import java.math.BigDecimal;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.TargetType;
@@ -13,16 +15,16 @@ import org.mapstruct.factory.Mappers;
  * @author Sjaak Derksen
  */
 @Mapper
-public interface SourceTargetMapper {
+public interface PlainTargetTypeMapper {
 
-    SourceTargetMapper INSTANCE = Mappers.getMapper( SourceTargetMapper.class );
+    PlainTargetTypeMapper INSTANCE = Mappers.getMapper( PlainTargetTypeMapper.class );
 
     Target sourceToTarget(Source source);
 
     @SuppressWarnings("unchecked")
-    default <T extends BaseType> T map(String string, @TargetType Class<T> clazz) {
-        if ( clazz == GenericWrapper.class ) {
-            return (T) new GenericWrapper<>( string );
+    default <T> T map(String string, @TargetType Class<T> clazz) {
+        if ( clazz == BigDecimal.class ) {
+            return (T) new BigDecimal( string );
         }
 
         return null;
@@ -47,13 +49,13 @@ public interface SourceTargetMapper {
 
     class Target {
 
-        private GenericWrapper<String> prop;
+        private BigDecimal prop;
 
-        public GenericWrapper<String> getProp() {
+        public BigDecimal getProp() {
             return prop;
         }
 
-        public void setProp(GenericWrapper<String> prop) {
+        public void setProp(BigDecimal prop) {
             this.prop = prop;
         }
     }
@@ -61,15 +63,4 @@ public interface SourceTargetMapper {
     class BaseType {
     }
 
-    class GenericWrapper<T> extends BaseType {
-        private final T wrapped;
-
-        public GenericWrapper(T someType) {
-            this.wrapped = someType;
-        }
-
-        public T getWrapped() {
-            return wrapped;
-        }
-    }
 }

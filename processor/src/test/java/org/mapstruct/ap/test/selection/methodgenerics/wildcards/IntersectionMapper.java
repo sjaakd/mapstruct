@@ -1,4 +1,4 @@
-package org.mapstruct.ap.test.selection.extra.wildcards;
+package org.mapstruct.ap.test.selection.methodgenerics.wildcards;
 
 import java.io.Serializable;
 

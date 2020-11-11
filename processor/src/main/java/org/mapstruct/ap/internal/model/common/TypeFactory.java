@@ -613,9 +613,11 @@ public class TypeFactory {
             if ( typeVariableType.getUpperBound() != null ) {
                 return typeVariableType.getUpperBound();
             }
-            // Lowerbounds intentionally left out: <T super Integer> is not allowed,
-            // see:http://www.angelikalanger.com/GenericsFAQ/FAQSections/
-            // TypeParameters.html#What%20is%20a%20bounded%20type%20parameter?
+            // lower bounds ( T super Number ) cannot be used for argument parameters, but can be used for
+            // method parameters: e.g.  <T super Number> T map (T in);
+            if ( typeVariableType.getLowerBound() != null ) {
+                return typeVariableType.getLowerBound();
+            }
         }
 
         return typeMirror;

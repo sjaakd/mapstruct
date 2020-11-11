@@ -5,8 +5,6 @@
  */
 package org.mapstruct.ap.test.selection.generics;
 
-import java.io.Serializable;
-
 public class GenericTypeMapper {
 
     public <T> T getWrapped(Wrapper<T> source) {

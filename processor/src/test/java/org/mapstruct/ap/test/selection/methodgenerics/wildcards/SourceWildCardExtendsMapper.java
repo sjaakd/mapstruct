@@ -1,12 +1,12 @@
-package org.mapstruct.ap.test.selection.extra.wildcards;
+package org.mapstruct.ap.test.selection.methodgenerics.wildcards;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
-public interface ExtendsMapper {
+public interface SourceWildCardExtendsMapper {
 
-    ExtendsMapper INSTANCE = Mappers.getMapper( ExtendsMapper.class );
+    SourceWildCardExtendsMapper INSTANCE = Mappers.getMapper( SourceWildCardExtendsMapper.class );
 
     Target map( Source source);
 

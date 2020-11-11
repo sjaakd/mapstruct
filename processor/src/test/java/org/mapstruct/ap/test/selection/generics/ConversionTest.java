@@ -5,6 +5,8 @@
  */
 package org.mapstruct.ap.test.selection.generics;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.math.BigDecimal;
 
 import org.junit.Test;
@@ -16,8 +18,6 @@ import org.mapstruct.ap.testutil.compilation.annotation.CompilationResult;
 import org.mapstruct.ap.testutil.compilation.annotation.Diagnostic;
 import org.mapstruct.ap.testutil.compilation.annotation.ExpectedCompilationOutcome;
 import org.mapstruct.ap.testutil.runner.AnnotationProcessorTestRunner;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for the invocation of generic methods for mapping bean properties.
@@ -130,20 +130,6 @@ public class ConversionTest {
                     "\"TypeA map(WildCardSuperWrapper<TypeA> value)\".")
         })
     public void shouldFailOnSuperBounds1() {
-    }
-
-    @Test
-    @WithClasses({ ErroneousSource5.class, ErroneousTarget5.class, ErroneousSourceTargetMapper5.class })
-    @ExpectedCompilationOutcome(value = CompilationResult.FAILED,
-        diagnostics = {
-            @Diagnostic(type = ErroneousSourceTargetMapper5.class,
-                kind = javax.tools.Diagnostic.Kind.ERROR,
-                line = 16,
-                message = "No target bean properties found: can't map property \"WildCardSuperWrapper<TypeC> " +
-                    "fooWildCardSuperTypeCFailure\" to \"TypeC fooWildCardSuperTypeCFailure\". " +
-                    "Consider to declare/implement a mapping method: \"TypeC map(WildCardSuperWrapper<TypeC> value)\".")
-        })
-    public void shouldFailOnSuperBounds2() {
     }
 
     @Test

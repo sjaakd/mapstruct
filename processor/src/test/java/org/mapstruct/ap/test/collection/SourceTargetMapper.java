@@ -22,7 +22,7 @@ public abstract class SourceTargetMapper {
 
     @Mappings({
         @Mapping(source = "integerList", target = "integerCollection"),
-        @Mapping(source = "integerSet", target = "set"),
+        @Mapping(source = "integerSet", target = "set" ),
         @Mapping(source = "anotherIntegerSet", target = "anotherStringSet"),
         @Mapping(source = "stringList2", target = "stringListNoSetter"),
         @Mapping(source = "stringSet2", target = "stringListNoSetter2"),
@@ -36,8 +36,6 @@ public abstract class SourceTargetMapper {
 
     @InheritConfiguration
     public abstract Target sourceToTargetTwoArg(Source source, @MappingTarget Target target);
-
-    public abstract Set<String> integerSetToStringSet(Set<Integer> integers);
 
     @InheritInverseConfiguration
     public abstract Set<Integer> stringSetToIntegerSet(Set<String> strings);
