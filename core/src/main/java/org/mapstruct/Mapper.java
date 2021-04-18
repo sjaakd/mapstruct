@@ -11,6 +11,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.mapstruct.conditional.NoCheck;
 import org.mapstruct.control.MappingControl;
 import org.mapstruct.factory.Mappers;
 
@@ -319,4 +320,16 @@ public @interface Mapper {
      * @since 1.4
      */
     Class<? extends Exception> unexpectedValueMappingException() default IllegalArgumentException.class;
+
+
+    /**
+     * For all bean properties (replaces NullValueCheckStrategy and NullValuePropertyMapping)
+     */
+    Class<? extends Annotation> propertyPresence() default NoCheck.class;
+
+    /**
+     * For all bean properties (replaces NullValueMappingStrategy)
+     */
+    Class<? extends Annotation> sourcePresence() default NoCheck.class;
+
 }

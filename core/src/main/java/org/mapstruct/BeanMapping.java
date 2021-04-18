@@ -11,6 +11,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.mapstruct.conditional.NoCheck;
 import org.mapstruct.control.MappingControl;
 
 import static org.mapstruct.NullValueCheckStrategy.ON_IMPLICIT_CONVERSION;
@@ -171,5 +172,15 @@ public @interface BeanMapping {
      * @see org.mapstruct.control.MappingControl
      */
     Class<? extends Annotation> mappingControl() default MappingControl.class;
+
+    /**
+     * For all bean properties (replaces NullValueCheckStrategy and NullValuePropertyMapping)
+     */
+    Class<? extends Annotation> propertyPresence() default NoCheck.class;
+
+    /**
+     * For all bean properties (replaces NullValueMappingStrategy)
+     */
+    Class<? extends Annotation> sourcePresence() default NoCheck.class;
 
 }

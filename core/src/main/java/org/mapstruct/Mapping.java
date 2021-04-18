@@ -15,6 +15,7 @@ import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import org.mapstruct.conditional.NoCheck;
 import org.mapstruct.control.MappingControl;
 
 import static org.mapstruct.NullValueCheckStrategy.ON_IMPLICIT_CONVERSION;
@@ -279,6 +280,7 @@ public @interface Mapping {
      *
      * @since 1.3
      */
+    @Deprecated
     String defaultExpression() default "";
 
     /**
@@ -290,16 +292,6 @@ public @interface Mapping {
      * @return {@code true} if the given property should be ignored, {@code false} otherwise
      */
     boolean ignore() default false;
-
-    /**
-     * A qualifier can be specified to aid the selection process of a suitable mapper. This is useful in case multiple
-     * mapping methods (hand written or generated) qualify and thus would result in an 'Ambiguous mapping methods found'
-     * error. A qualifier is a custom annotation and can be placed on a hand written mapper class or a method.
-     *
-     * @return the qualifiers
-     * @see Qualifier
-     */
-    Class<? extends Annotation>[] qualifiedBy() default { };
 
     /**
      * String-based form of qualifiers; When looking for a suitable mapping method for a given property, MapStruct will
@@ -409,6 +401,8 @@ public @interface Mapping {
      */
     Class<? extends Annotation> mappingControl() default MappingControl.class;
 
-
-
+    /**
+     * For properties (replaces NullValueCheckStrategy and NullValuePropertyMapping)
+     */
+    Class<? extends Annotation> propertyPresence() default NoCheck.class;
 }

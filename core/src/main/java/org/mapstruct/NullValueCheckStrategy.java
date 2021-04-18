@@ -18,6 +18,7 @@ package org.mapstruct;
  *
  * @author Sean Huang
  */
+@Deprecated
 public enum NullValueCheckStrategy {
 
     /**

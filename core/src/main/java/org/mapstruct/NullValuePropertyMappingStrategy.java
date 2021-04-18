@@ -6,6 +6,7 @@
 package org.mapstruct;
 
 /**
+ *
  * Strategy for dealing with {@code null} or not present properties in the source bean. The
  * {@link NullValuePropertyMappingStrategy} can be defined on {@link MapperConfig}, {@link Mapper}, {@link BeanMapping}
  * and {@link Mapping}.
@@ -24,6 +25,7 @@ package org.mapstruct;
  * @author Sjaak Derksen
  * @since 1.3
  */
+@Deprecated
 public enum NullValuePropertyMappingStrategy {
 
     /**

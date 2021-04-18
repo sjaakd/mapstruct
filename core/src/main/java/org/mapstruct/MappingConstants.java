@@ -119,4 +119,26 @@ public final class MappingConstants {
 
     }
 
+    /**
+     * @since
+     */
+    public static final class ElseMapping {
+
+        private ElseMapping() {
+        }
+
+        /**
+         */
+        public static final String SET_TO_NULL = "<SET_TO_NULL>";
+
+        /**
+         */
+        public static final String SET_TO_DEFAULT = "<SET_TO_DEFAULT>";
+
+        /**
+         */
+        public static final String NO_ELSE_BRANCH = "<NO_ELSE_BRANCH>";
+
+    }
+
 }
